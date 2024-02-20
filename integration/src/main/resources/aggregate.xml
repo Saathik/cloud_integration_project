@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:int="http://www.springframework.org/schema/integration"
+       xmlns:context="http://www.springframework.org/schema/context"
+       xmlns:int-file="http://www.springframework.org/schema/integration/file"
+       xmlns:jdbc="http://www.springframework.org/schema/jdbc"
+       xmlns:task="http://www.springframework.org/schema/task"
+       xmlns:int-jdbc="http://www.springframework.org/schema/integration/jdbc"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans
+           http://www.springframework.org/schema/beans/spring-beans.xsd
+           http://www.springframework.org/schema/integration
+           http://www.springframework.org/schema/integration/spring-integration-5.1.xsd
+           http://www.springframework.org/schema/integration/file
+           http://www.springframework.org/schema/integration/file/spring-integration-file-5.1.xsd
+           http://www.springframework.org/schema/context
+           http://www.springframework.org/schema/context/spring-context.xsd
+           http://www.springframework.org/schema/jdbc
+           http://www.springframework.org/schema/jdbc/spring-jdbc.xsd
+           http://www.springframework.org/schema/task
+           http://www.springframework.org/schema/task/spring-task.xsd
+           http://www.springframework.org/schema/integration/jdbc
+           https://www.springframework.org/schema/integration/jdbc/spring-integration-jdbc.xsd">
+
+    <context:component-scan base-package="test"/>
+    <int:poller id="poller" default="true" fixed-delay="2000"/>
+
+    <jdbc:embedded-database id="script" type="H2">
+        <jdbc:script location="classpath:script.sql"/>
+    </jdbc:embedded-database>
+
+    <int-file:inbound-channel-adapter directory="dataIn" id="jsonChannel"/>
+    <int-file:inbound-channel-adapter directory="dataIn" id="teamChannel"/>
+    <int-file:inbound-channel-adapter directory="dataIn" id="playerChannel"/>
+
+    <int-file:inbound-channel-adapter
+            channel="jsonChannel"
+            directory="dataIn/teams"
+            filename-pattern="*.json">
+    </int-file:inbound-channel-adapter>
+
+    <int:json-to-object-transformer input-channel="jsonChannel" output-channel="teamChannel" type="test.model.Team"/>
+
+    <int-file:inbound-channel-adapter
+            channel="jsonChannel"
+            directory="dataIn/players"
+            filename-pattern="*.json">
+    </int-file:inbound-channel-adapter>
+
+    <int:json-to-object-transformer input-channel="jsonChannel" output-channel="playerChannel" type="test.model.Player"/>
+
+    <int-jdbc:outbound-channel-adapter
+            query="INSERT INTO TEAM (id, name, country)
+            values (:payload.id, :payload.name, :payload.country)"
+            data-source="script"
+            channel="teamChannel"/>
+
+    <int-jdbc:outbound-channel-adapter
+            query="INSERT INTO PLAYER (id, first_name, last_name)
+            values (:payload.id, :payload.first_name, :payload.last_name)"
+            data-source="script"
+            channel="playerChannel"/>
+
+    <!-- Not Working
+    <int:channel id="teamPlayerChannel"/>
+    <int:service-activator input-channel="teamChannel" output-channel="teamPlayerChannel" ref="teamPlayerService" method="insertTeamPlayer"/>
+    <int:service-activator input-channel="playerChannel" output-channel="teamPlayerChannel" ref="teamPlayerService" method="insertTeamPlayer"/>
+ -->
+    <task:executor id="pollerExecutorDB"/>
+</beans>
